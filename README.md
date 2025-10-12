@@ -1,17 +1,21 @@
-<img src="assets/example.png"   alt="Example of Kindle-style footer time">
-<p align="center"><em>Result of installing both patches</em></p>
-
 # KOReader Kindle-Style UI
 
-This repository contains two complementary KOReader patches designed to enhance your reading experience:
+This repository contains two complementary KOReader patches designed to enhance your reading experience.
 
-Adds customizations to KOReader’s footer, transforming the chapter time display to mimic the Kindle style. It shows "Time left in chapter: X minute(s)" while reading and "Chapter completed" on the last page of each chapter, complete with proper singular/plural usage. Additionally, it introduces margin padding around the footer text for improved readability.
-### [Footer Patch – click to download](2-reader-header-centered.lua) 
+Adds customizations to KOReader’s footer, transforming the chapter time display to mimic the Kindle style. It shows **"Time left in chapter: X minute(s)"** while reading and **"Chapter completed"** on the last page of each chapter, complete with proper singular/plural usage. Additionally, it introduces margin padding around the footer text for improved readability.
+
+### [Footer Patch – click to download](2-kindle-time-left.lua) 
 
 ### [Header Patch – click to download](2-reader-header-centered.lua) (based on [joshuacant's patch](https://github.com/joshuacant/KOReader.patches/blob/main/2-reader-header-centered.lua)).
 This patch is a modification of the excellent joshuacant’s reader header-centered patch. It displays the clock centered at the top of the reader screen. The modification adapts the design to fit cohesively with the footer changes provided here, creating a consistent UI layout.
 
 Together, these patches offer a Kindle-inspired layout with time information elegantly placed at the top center and detailed chapter timing and progress at the footer.
+
+<p align="center">
+  <img src="assets/example.png" alt="Example of Kindle-style footer" height="400" />
+  <br />
+  <em>Result of installing both patches</em>
+</p>
 
 ## Prerequisites
 
