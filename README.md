@@ -4,11 +4,23 @@ This repository contains two complementary KOReader patches designed to enhance 
 
 Adds customizations to KOReader’s footer, transforming the chapter time display to mimic the Kindle style. It shows **"Time left in chapter: X minute(s)"** while reading and **"Chapter completed"** on the last page of each chapter, complete with proper singular/plural usage. Additionally, it introduces margin padding around the footer text for improved readability.
 
-### [Footer Patch – click to download](2-kindle-time-left.lua) 
+# Downloads
 
-### [Header Patch – click to download](2-reader-header-centered.lua) (based on [joshuacant's patch](https://github.com/joshuacant/KOReader.patches/blob/main/2-reader-header-centered.lua)).
+> **IMPORTANT: KOReader v2025.10 included changes on the footer. Please download the correct patch for your version.**
+
+### Time left (footer) patch
+1. For KOReader v2025.10 and NEWER
+- Download `2-kindle-time-left.lua` in root folder or click [**here**](2-kindle-time-left.lua).
+
+2. For KOReader v2025.08
+- Download `2-kindle-time-left.lua` in `patches/legacy_pre-v2025.10` folder for older version or click [**here**](patches/legacy_pre-v2025.10/2-kindle-time-left.lua).
+
+### Header Patch
+[Click to download](2-reader-header-centered.lua) (based on [joshuacant's patch](https://github.com/joshuacant/KOReader.patches/blob/main/2-reader-header-centered.lua)).
+
 This patch is a modification of the excellent joshuacant’s reader header-centered patch. It displays the clock centered at the top of the reader screen. The modification adapts the design to fit cohesively with the footer changes provided here, creating a consistent UI layout.
 
+# Demonstration
 Together, these patches offer a Kindle-inspired layout with time information elegantly placed at the top center and detailed chapter timing and progress at the footer.
 
 <p align="center">

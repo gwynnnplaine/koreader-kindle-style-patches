@@ -76,13 +76,11 @@ local function getTimeString(footer, pages_left)
         local ok, time_string = pcall(function()
             return footer.ui.statistics:getTimeForPages(pages_left)
         end)
-
         if ok and time_string then
             return time_string
         end
     end
-
-
+    
     -- Method 2: Works on Kindle
     if footer.getDataFromStatistics then
         local ok, time_string = pcall(function()
@@ -98,11 +96,6 @@ end
 
 function  footerTextGeneratorMap.chapter_time_to_read(footer)
     local originalTimeToRead = original_footerTextGeneratorMap_chapter_time_to_read(footer)
-
-    -- After v2025.10 update we should check if statistic data is initialized
-    if not (footer.ui.statistics and footer.ui.statistics.is_doc) then
-        return originalTimeToRead
-    end
 
     local left = footer.ui.toc:getChapterPagesLeft(footer.pageno) or footer.ui.document:getTotalPagesLeft(footer.pageno)
     if not left then
