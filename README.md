@@ -40,6 +40,9 @@ Together, these patches offer a Kindle-inspired layout with time information ele
 
 2. Configure KOReader status bar settings as follows:
    - Navigate to **Status bar → Status bar items**
+   - Disable **Show progress bar**
+   - Navigate to **Configure items**
+      - Select **Show all selected items at once**
    - Enable only these three items:
      1. **Progress percentage**
      2. **Time left to finish chapter**
@@ -61,4 +64,3 @@ Together, these patches offer a Kindle-inspired layout with time information ele
 
 ### Additional Information
 You can easily customize margins, spacing, padding, and fonts by editing the patch code directly. Adjust the number of spaces or text formatting inside the Lua file to fit your screen and preferences. Restart KOReader after changes to see the effect.
-
