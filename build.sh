@@ -11,10 +11,9 @@ OUTPUT="2-kindle-time-left.lua"
 FILES=(
     "$SRC_DIR/config.lua"
     "$SRC_DIR/helpers.lua"
-    # "$SRC_DIR/presets.lua"
+    "$SRC_DIR/presets.lua"
     "$SRC_DIR/footer.lua"
-    # "$SRC_DIR/main.lua",
-
+    "$SRC_DIR/main.lua"
 )
 
 echo "Building $OUTPUT..."
