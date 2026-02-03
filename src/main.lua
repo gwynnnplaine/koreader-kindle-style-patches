@@ -58,12 +58,16 @@ local function addKindleUIpreset()
 
 	local footer = ui.footer
 
-	-- Create presets
-	createPresets(footer)
+	-- Create presets safely (only if not already initialized)
+	createPresetsSafely(footer)
 
-	-- Apply changes
-	footer:updateFooterTextGenerator()
-	footer:onUpdateFooter(true)
+	-- Apply the active preset (or default to Kindle UI)
+	local activePreset = getActivePreset()
+	if not applyPreset(activePreset, footer) then
+		-- Fallback to Kindle UI if active preset doesn't exist
+		applyPreset("Kindle UI", footer)
+		setActivePreset("Kindle UI")
+	end
 end
 
 -- Apply when UIManager is ready
