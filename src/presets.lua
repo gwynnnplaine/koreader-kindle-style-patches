@@ -1,5 +1,3 @@
--- Preset definitions for footer
-
 local function createPresets(footer)
 	local util = require("util")
 	local presets = G_reader_settings:readSetting("footer_presets", {})
@@ -40,7 +38,6 @@ local function createPresets(footer)
 		reader_footer_custom_text_repetitions = 1,
 	}
 
-	-- Default KOReader preset
 	local default_footer = util.tableDeepCopy(footer.default_settings)
 	default_footer.all_at_once = false
 	default_footer.order = {"page_progress", "time"}
@@ -54,4 +51,61 @@ local function createPresets(footer)
 
 	G_reader_settings:saveSetting("footer_presets", presets)
 	return presets
+end
+
+-- Safety-checked preset creation
+local function createPresetsSafely(footer)
+	local initialized = G_reader_settings:readSetting("presets_initialized", false)
+	if not initialized then
+		createPresets(footer)
+		G_reader_settings:saveSetting("presets_initialized", true)
+	end
+	return G_reader_settings:readSetting("footer_presets", {})
+end
+
+-- Apply a preset to the footer
+local function applyPreset(presetName, footer)
+	local presets = G_reader_settings:readSetting("footer_presets", {})
+	local preset = presets[presetName]
+
+	if not preset then
+		return false
+	end
+
+	-- Apply footer settings
+	for key, value in pairs(preset.footer) do
+		footer.settings[key] = value
+	end
+
+	-- Apply other settings
+	if preset.reader_footer_mode then
+		footer.mode = preset.reader_footer_mode
+	end
+	if preset.reader_footer_custom_text then
+		footer.custom_text = preset.reader_footer_custom_text
+	end
+	if preset.reader_footer_custom_text_repetitions then
+		footer.custom_text_repetitions = preset.reader_footer_custom_text_repetitions
+	end
+
+	-- Refresh footer
+	footer:updateFooterTextGenerator()
+	footer:onUpdateFooter(true)
+
+	return true
+end
+
+-- Get currently active preset name
+local function getActivePreset()
+	return G_reader_settings:readSetting("footer_active_preset", "Kindle UI")
+end
+
+-- Set active preset name
+local function setActivePreset(presetName)
+	G_reader_settings:saveSetting("footer_active_preset", presetName)
+end
+
+-- Get all presets
+local function getPresets()
+	return G_reader_settings:readSetting("footer_presets", {})
 end
