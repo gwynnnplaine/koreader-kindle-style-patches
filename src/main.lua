@@ -1,6 +1,56 @@
--- Main entry point for patch
+local UIManager = require("ui/uimanager")
+local ReaderFooter = require("apps/reader/modules/readerfooter")
+local NotificationWidget = require("ui/widget/notification")
 
-local function applyCustomStatusBarSettings()
+-- Hook into ReaderFooter menu to add Presets submenu
+local orig_getMenuItems = ReaderFooter.getMenuItems
+function ReaderFooter:getMenuItems()
+	local items = orig_getMenuItems(self)
+	
+	-- Find the status bar settings section or add to end
+	local preset_menu = {
+		text = "Presets",
+		sub_item_table = {
+			{
+				text = "Kindle UI",
+				checked_func = function()
+					return getActivePreset() == "Kindle UI"
+				end,
+				callback = function()
+					local footer = require("apps/reader/readerui").instance.footer
+					if applyPreset("Kindle UI", footer) then
+						setActivePreset("Kindle UI")
+						UIManager:show(NotificationWidget:new{
+							text = "Preset applied: Kindle UI",
+							timeout = 2,
+						})
+					end
+				end,
+			},
+			{
+				text = "Default KOReader",
+				checked_func = function()
+					return getActivePreset() == "Default KOReader"
+				end,
+				callback = function()
+					local footer = require("apps/reader/readerui").instance.footer
+					if applyPreset("Default KOReader", footer) then
+						setActivePreset("Default KOReader")
+						UIManager:show(NotificationWidget:new{
+							text = "Preset applied: Default KOReader",
+							timeout = 2,
+						})
+					end
+				end,
+			},
+		},
+	}
+	
+	table.insert(items, preset_menu)
+	return items
+end
+
+local function addKindleUIpreset()
 	local ui = require("apps/reader/readerui").instance
 	if not ui or not ui.footer then
 		return
@@ -11,41 +61,10 @@ local function applyCustomStatusBarSettings()
 	-- Create presets
 	createPresets(footer)
 
-	-- Apply Kindle UI settings directly
-	footer.settings.all_at_once = true
-	footer.settings.percentage = true
-	footer.settings.chapter_time_to_read = true
-	footer.settings.dynamic_filler = true
-
-	-- Disable other items
-	footer.settings.page_progress = false
-	footer.settings.pages_left_book = false
-	footer.settings.time = false
-	footer.settings.chapter_progress = false
-	footer.settings.pages_left = false
-	footer.settings.battery = false
-	footer.settings.book_time_to_read = false
-	footer.settings.bookmark_count = false
-	footer.settings.mem_usage = false
-	footer.settings.wifi_status = false
-	footer.settings.page_turning_inverted = false
-	footer.settings.book_author = false
-	footer.settings.book_title = false
-	footer.settings.book_chapter = false
-	footer.settings.custom_text = false
-
-	-- Set order and styling
-	footer.settings.order = {"chapter_time_to_read", "dynamic_filler", "percentage"}
-	footer.settings.items_separator = "none"
-	footer.settings.item_prefix = "compact_items"
-	footer.settings.align = "left"
-	footer.settings.container_height = 20
-	footer.settings.container_bottom_padding = 5
-
 	-- Apply changes
 	footer:updateFooterTextGenerator()
 	footer:onUpdateFooter(true)
 end
 
 -- Apply when UIManager is ready
-UIManager:runAfterNextRender(applyCustomStatusBarSettings)
+UIManager:runAfterNextRender(addKindleUIpreset)
