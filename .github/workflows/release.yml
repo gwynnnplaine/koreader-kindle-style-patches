@@ -1,0 +1,85 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Build patches
+      run: |
+        chmod +x build.sh
+        ./build.sh
+    
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: ${{ github.ref }}
+        draft: false
+        prerelease: false
+        body: |
+          ## Installation
+          
+          Choose the version that fits your needs:
+          
+          ### 2-kindle-time-left.lua (Recommended)
+          **Includes**: Footer + Header (centered clock at top)
+          
+          ### 2-kindle-time-left-no-header.lua
+          **Includes**: Footer only (if you don't want the header)
+          
+          ### Installation Steps
+          1. Download your preferred version from Assets below
+          2. Copy to your KOReader device's `koreader/patches/` directory
+          3. Restart KOReader
+          
+          ## What's Included
+          
+          **Footer Features:**
+          - Kindle-style "Time left in chapter" display
+          - Progress percentage
+          - "Chapter completed" message on last page
+          - Proper singular/plural formatting
+          
+          **Header Features:** (in combined version only)
+          - Centered clock at top of screen
+          - Respects 12/24h time format setting
+          - Only shows for EPUBs (not PDFs)
+          
+          ## Configuration
+          
+          To customize the header, edit `src/header.lua` before building:
+          - `top_padding`: Top margin in pixels (default: 8)
+          - `font_size`: Font size in pixels (default: 16)  
+          - `show_for_pdf`: Show header for PDFs (default: false)
+    
+    - name: Upload Combined Patch
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./2-kindle-time-left.lua
+        asset_name: 2-kindle-time-left.lua
+        asset_content_type: text/plain
+    
+    - name: Upload Footer-Only Patch
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./2-kindle-time-left-no-header.lua
+        asset_name: 2-kindle-time-left-no-header.lua
+        asset_content_type: text/plain
