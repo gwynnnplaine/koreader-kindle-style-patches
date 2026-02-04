@@ -1,18 +1,9 @@
 -- 2-kindle-time-left.lua
--- Kindle-style footer patch for KOReader
+-- Combined Kindle-style footer and centered clock header for KOReader
 -- Auto-generated from src/ directory - DO NOT EDIT DIRECTLY
--- Edit files in src/ and run ./build.sh instead
 
 
--- === config.lua ===
-
-local CONFIG = {
-	CHAPTER_COMPLETED_TEXT = "Chapter completed",
-	LABEL_TEXT = "Time left in chapter:",
-	LABEL_MIN_WIDTH = 5, -- Minimum character width for label (for alignment)
-	FOOTER_LEFT_MARGIN = 1, -- Character spaces on left
-	FOOTER_RIGHT_MARGIN = 2, -- Character spaces on right
-}
+-- ============ FOOTER SECTION ============
 
 
 -- === helpers.lua ===
@@ -109,6 +100,13 @@ local helpers = {
 local ReaderFooter = require("apps/reader/modules/readerfooter")
 local userpatch = require("userpatch")
 
+local FOOTER_CONFIG = {
+	CHAPTER_COMPLETED_TEXT = "Chapter completed",
+	LABEL_TEXT = "Time left in chapter:",
+	LABEL_MIN_WIDTH = 5, -- Minimum character width for label (for alignment)
+	FOOTER_LEFT_MARGIN = 1, -- Character spaces on left
+	FOOTER_RIGHT_MARGIN = 2, -- Character spaces on right
+}
 
 local orig_genFooterText = ReaderFooter.genAllFooterText
 local footerTextGeneratorMap = userpatch.getUpValue(ReaderFooter.applyFooterMode, "footerTextGeneratorMap")
@@ -140,7 +138,7 @@ local function calculateReadingTime(footer, pages_left)
 end
 
 local function formatChapterTimeDisplay(time)
-	local result = string.format("%-" .. CONFIG.LABEL_MIN_WIDTH .. "s %s", CONFIG.LABEL_TEXT, time)
+	local result = string.format("%-" .. FOOTER_CONFIG.LABEL_MIN_WIDTH .. "s %s", FOOTER_CONFIG.LABEL_TEXT, time)
 	return result
 end
 
@@ -157,7 +155,7 @@ function footerTextGeneratorMap.chapter_time_to_read(footer)
 	end
 
 	if pagesLeft == 0 then
-		return CONFIG.CHAPTER_COMPLETED_TEXT
+		return FOOTER_CONFIG.CHAPTER_COMPLETED_TEXT
 	end
 
 	local readingTime = calculateReadingTime(footer, pagesLeft)
@@ -172,8 +170,8 @@ end
 -- Override genAllFooterText for margins
 function ReaderFooter:genAllFooterText(...)
 	local text, is_filler_inside = orig_genFooterText(self, ...)
-	local left_margin = string.rep(" ", CONFIG.FOOTER_LEFT_MARGIN)
-	local right_margin = string.rep(" ", CONFIG.FOOTER_RIGHT_MARGIN)
+	local left_margin = string.rep(" ", FOOTER_CONFIG.FOOTER_LEFT_MARGIN)
+	local right_margin = string.rep(" ", FOOTER_CONFIG.FOOTER_RIGHT_MARGIN)
 	return left_margin .. text .. right_margin, is_filler_inside
 end
 
@@ -187,10 +185,8 @@ local orig_init = ReaderFooter.init
 function ReaderFooter:init(...)
 	orig_init(self, ...)
 
-	-- Delay settings application until after KOReader loads saved settings
 	UIManager:tickAfterNext(function()
-		-- Check if we've already applied our settings
-		local kindle_ui_applied = G_reader_settings:readSetting("kindle_ui_applied_test", false)
+		local kindle_ui_applied = G_reader_settings:readSetting("kindle_ui_applied", false)
 
 		if not kindle_ui_applied then
 			-- Apply Kindle UI settings (first run only)
@@ -232,10 +228,126 @@ function ReaderFooter:init(...)
 			self:applyFooterMode()
 			self:resetLayout()
 
-			G_reader_settings:saveSetting("kindle_ui_applied_test", true)
+			G_reader_settings:saveSetting("kindle_ui_applied", true)
 			if G_reader_settings.flush then
 				G_reader_settings:flush()
 			end
 		end
 	end)
+end
+
+-- ============ HEADER SECTION ============
+
+
+-- === header.lua ===
+
+-- Modify these values to customize the header appearance
+local HEADER_CONFIG = {
+    -- Spacing
+    top_padding = 12,          -- Top margin in pixels
+    -- Font
+    font_face = "ffont",       -- Font name
+    font_size = 16,            -- Font size in pixels
+    font_bold = true,         --  Use bold font?
+    font_color = nil,          -- Font color (nil = COLOR_BLACK)
+    -- Margins
+    use_book_margins = true,   -- Use same margins as book for header
+    margin = nil,              -- Fallback margin if book margins disabled (nil = Size.padding.large)
+    max_width_pct = 100,       -- Maximum width % before truncating (default: 100)
+    -- Behavior
+    show_for_pdf = false,      -- Show header for PDF/CBZ files?
+}
+
+-- ==========================================
+-- Implementation - No need to modify below
+-- ==========================================
+local Blitbuffer = require("ffi/blitbuffer")
+local TextWidget = require("ui/widget/textwidget")
+local CenterContainer = require("ui/widget/container/centercontainer")
+local VerticalGroup = require("ui/widget/verticalgroup")
+local VerticalSpan = require("ui/widget/verticalspan")
+local HorizontalGroup = require("ui/widget/horizontalgroup")
+local HorizontalSpan = require("ui/widget/horizontalspan")
+local BD = require("ui/bidi")
+local Size = require("ui/size")
+local Geom = require("ui/geometry")
+local Font = require("ui/font")
+local datetime = require("datetime")
+local Device = require("device")
+local Screen = Device.screen
+local ReaderView = require("apps/reader/modules/readerview")
+
+local orig_paintTo = ReaderView.paintTo
+
+function ReaderView:paintTo(bb, x, y)
+    orig_paintTo(self, bb, x, y)
+
+	if self.render_mode ~= nil and not HEADER_CONFIG.show_for_pdf then
+		return
+	end
+
+	-- Get configuration values with defaults
+	local font_color = HEADER_CONFIG.font_color or Blitbuffer.COLOR_BLACK
+	local fallback_margin = HEADER_CONFIG.margin or Size.padding.large
+
+	-- Calculate margins
+	local screen_width = Screen:getWidth()
+	local left_margin = fallback_margin
+	local right_margin = fallback_margin
+
+	if HEADER_CONFIG.use_book_margins and self.document and self.document.getPageMargins then
+		local doc_margins = self.document:getPageMargins()
+		left_margin = doc_margins.left or fallback_margin
+		right_margin = doc_margins.right or fallback_margin
+	end
+
+	local margins = left_margin + right_margin
+	local avail_width = screen_width - margins
+
+	local time = datetime.secondsToHour(os.time(), G_reader_settings:isTrue("twelve_hour_clock"))
+
+	local function getFittedText(text, max_width_pct)
+		if text == nil or text == "" then
+			return ""
+		end
+		local text_widget = TextWidget:new{
+			text = text:gsub(" ", "\u{00A0}"), -- no-break-space
+			max_width = avail_width * max_width_pct * (1/100),
+			face = Font:getFace(HEADER_CONFIG.font_face, HEADER_CONFIG.font_size),
+			bold = HEADER_CONFIG.font_bold,
+			padding = 0,
+		}
+		local fitted_text, add_ellipsis = text_widget:getFittedText()
+		text_widget:free()
+		if add_ellipsis then
+			fitted_text = fitted_text .. "…"
+		end
+		return BD.auto(fitted_text)
+	end
+
+	local header_content = getFittedText(time, HEADER_CONFIG.max_width_pct)
+
+	local header_text = TextWidget:new{
+		text = header_content,
+		face = Font:getFace(HEADER_CONFIG.font_face, HEADER_CONFIG.font_size),
+		bold = HEADER_CONFIG.font_bold,
+		fgcolor = font_color,
+		padding = 0,
+	}
+
+	local header_height = header_text:getSize().h + HEADER_CONFIG.top_padding
+
+	local header = CenterContainer:new{
+		dimen = Geom:new{ w = screen_width, h = header_height },
+		VerticalGroup:new{
+			VerticalSpan:new{ width = HEADER_CONFIG.top_padding },
+			HorizontalGroup:new{
+				HorizontalSpan:new{ width = left_margin },
+				header_text,
+				HorizontalSpan:new{ width = right_margin },
+			},
+		},
+	}
+
+	header:paintTo(bb, x, y)
 end
