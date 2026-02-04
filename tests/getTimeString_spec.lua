@@ -1,4 +1,4 @@
--- Tests for getTimeString function from 2-kindle-time-left patch
+-- Tests for getTimeString function from 2-mimic-kindle-ui-patch patch
 
 describe("getTimeString()", function()
     local getTimeString

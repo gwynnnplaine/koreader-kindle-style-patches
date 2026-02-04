@@ -1,4 +1,4 @@
--- Tests for getMinutes function from 2-kindle-time-left patch
+-- Tests for getMinutes function from 2-mimic-kindle-ui-patch patch
 
 local function getMinutes(time_string)
     if not time_string or time_string == "" then

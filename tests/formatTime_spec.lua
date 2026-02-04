@@ -1,4 +1,4 @@
--- Tests for formatTime function from 2-kindle-time-left patch
+-- Tests for formatTime function from 2-mimic-kindle-ui-patch patch
 
 local function formatTime(minutes)
 	if minutes <= 0 then

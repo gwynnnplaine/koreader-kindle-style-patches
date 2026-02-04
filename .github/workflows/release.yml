@@ -3,83 +3,83 @@ name: Build and Release
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    
-    - name: Build patches
-      run: |
-        chmod +x build.sh
-        ./build.sh
-    
-    - name: Create Release
-      id: create_release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: ${{ github.ref }}
-        release_name: ${{ github.ref }}
-        draft: false
-        prerelease: false
-        body: |
-          ## Installation
-          
-          Choose the version that fits your needs:
-          
-          ### 2-kindle-time-left.lua (Recommended)
-          **Includes**: Footer + Header (centered clock at top)
-          
-          ### 2-kindle-time-left-no-header.lua
-          **Includes**: Footer only (if you don't want the header)
-          
-          ### Installation Steps
-          1. Download your preferred version from Assets below
-          2. Copy to your KOReader device's `koreader/patches/` directory
-          3. Restart KOReader
-          
-          ## What's Included
-          
-          **Footer Features:**
-          - Kindle-style "Time left in chapter" display
-          - Progress percentage
-          - "Chapter completed" message on last page
-          - Proper singular/plural formatting
-          
-          **Header Features:** (in combined version only)
-          - Centered clock at top of screen
-          - Respects 12/24h time format setting
-          - Only shows for EPUBs (not PDFs)
-          
-          ## Configuration
-          
-          To customize the header, edit `src/header.lua` before building:
-          - `top_padding`: Top margin in pixels (default: 8)
-          - `font_size`: Font size in pixels (default: 16)  
-          - `show_for_pdf`: Show header for PDFs (default: false)
-    
-    - name: Upload Combined Patch
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./2-kindle-time-left.lua
-        asset_name: 2-kindle-time-left.lua
-        asset_content_type: text/plain
-    
-    - name: Upload Footer-Only Patch
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./2-kindle-time-left-no-header.lua
-        asset_name: 2-kindle-time-left-no-header.lua
-        asset_content_type: text/plain
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build patches
+        run: |
+          chmod +x build.sh
+          ./build.sh
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: ${{ github.ref }}
+          draft: false
+          prerelease: false
+          body: |
+            ## Installation
+
+            Choose the version that fits your needs:
+
+            ### 2-mimic-kindle-ui-patch.lua (Recommended)
+            **Includes**: Footer + Header (centered clock at top)
+
+            ### 2-mimic-kindle-ui-patch-no-header.lua
+            **Includes**: Footer only (if you don't want the header)
+
+            ### Installation Steps
+            1. Download your preferred version from Assets below
+            2. Copy to your KOReader device's `koreader/patches/` directory
+            3. Restart KOReader
+
+            ## Configuration
+
+            Each component has its own configuration block:
+
+            ### Header Configuration (`src/header.lua`)
+            - `top_padding`: Top margin in pixels (default: 12)
+            - `font_size`: Font size in pixels (default: 16)
+            - `font_bold`: Use bold font (default: true)
+            - `show_for_pdf`: Show header for PDFs (default: false)
+            - `max_width_pct`: Maximum width percentage (default: 100)
+
+            ### Footer Configuration (`src/footer.lua`)
+            - `LABEL_TEXT`: Text displayed before time reading (default: "Time left in chapter:")
+            - `CHAPTER_COMPLETED_TEXT`: Text shown when chapter is complete (default: "Chapter completed")
+            - `LABEL_MIN_WIDTH`: Minimum character width for alignment (default: 5)
+            - `FOOTER_LEFT_MARGIN`: Left padding in character spaces (default: 1)
+            - `FOOTER_RIGHT_MARGIN`: Right padding in character spaces (default: 2)
+
+            Edit the respective configuration tables before building to customize each component.
+
+      - name: Upload Combined Patch
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./2-mimic-kindle-ui-patch.lua
+          asset_name: 2-mimic-kindle-ui-patch.lua
+          asset_content_type: text/plain
+
+      - name: Upload Footer-Only Patch
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./2-mimic-kindle-ui-patch-no-header.lua
+          asset_name: 2-mimic-kindle-ui-patch-no-header.lua
+          asset_content_type: text/plain

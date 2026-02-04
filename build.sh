@@ -5,12 +5,12 @@ set -e
 SRC_DIR="src"
 
 build_combined() {
-    local OUTPUT="2-kindle-time-left.lua"
+    local OUTPUT="2-mimic-kindle-ui-patch.lua"
     echo "Building combined patch: $OUTPUT..."
 
-    echo "-- 2-kindle-time-left.lua" > $OUTPUT
+    echo "-- 2-mimic-kindle-ui-patch.lua" > $OUTPUT
     echo "-- Combined Kindle-style footer and centered clock header for KOReader" >> $OUTPUT
-    echo "-- Auto-generated from src/ directory - DO NOT EDIT DIRECTLY" >> $OUTPUT
+    echo "-- To customize: Edit only HEADER_CONFIG and FOOTER_CONFIG sections" >> $OUTPUT
     echo "" >> $OUTPUT
 
     FILES=(
@@ -62,12 +62,12 @@ build_combined() {
 }
 
 build_footer_only() {
-    local OUTPUT="2-kindle-time-left-no-header.lua"
+    local OUTPUT="2-mimic-kindle-ui-patch-no-header.lua"
     echo "Building footer-only patch: $OUTPUT..."
 
-    echo "-- 2-kindle-time-left-no-header.lua" > $OUTPUT
+    echo "-- 2-mimic-kindle-ui-patch-no-header.lua" > $OUTPUT
     echo "-- Kindle-style footer patch (without header) for KOReader" >> $OUTPUT
-    echo "-- Auto-generated from src/ directory - DO NOT EDIT DIRECTLY" >> $OUTPUT
+    echo "-- To customize: Edit only FOOTER_CONFIG section" >> $OUTPUT
     echo "" >> $OUTPUT
 
     FILES=(
