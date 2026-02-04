@@ -1,1 +1,4 @@
 .DS_Store
+2-mimic-kindle-ui-patch.lua
+2-mimic-kindle-ui-patch-no-header.lua
+2-reader-header-centered.lua
