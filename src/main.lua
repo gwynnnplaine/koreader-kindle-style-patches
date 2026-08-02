@@ -1,7 +1,27 @@
 local UIManager = require("ui/uimanager")
 local ReaderFooter = require("apps/reader/modules/readerfooter")
+local FontChooser = require("ui/widget/fontchooser")
+local helpers = require("helpers").helpers
 
 local orig_init = ReaderFooter.init
+
+-- KOReader >= 2025 stores text_font_face as a path, which never gets promoted to
+-- the real bold file: text_font_bold then renders as light synthesized bold.
+local function useRealBoldFontFace(footer)
+	if footer.settings.text_font_bold ~= true then
+		return false
+	end
+
+	local isRegistered = FontChooser and FontChooser.isFontRegistered
+	local bold_face = helpers.resolveBoldFontFace(footer.settings.text_font_face, isRegistered)
+	if not bold_face then
+		return false
+	end
+
+	footer.settings.text_font_face = bold_face
+	footer.settings.text_font_bold = false
+	return true
+end
 
 local function rebuildFooterModeState(footer)
 	footer:set_mode_index()
@@ -44,6 +64,7 @@ function ReaderFooter:init(...)
 		local kindle_ui_applied = G_reader_settings:readSetting("kindle_ui_applied", false)
 		local should_refresh_layout = false
 		local should_flush = false
+		local should_repaint = false
 
 		if not kindle_ui_applied then
 			-- Apply Kindle UI settings (first run only)
@@ -81,11 +102,22 @@ function ReaderFooter:init(...)
 			self.settings.align = "left"
 			self.settings.container_height = 20
 			self.settings.container_bottom_padding = 5
+			self.settings.text_font_bold = true
 
 			G_reader_settings:saveSetting("kindle_ui_applied", true)
 			G_reader_settings:saveSetting("footer", self.settings)
 			should_refresh_layout = true
 			should_flush = true
+		end
+
+		if useRealBoldFontFace(self) then
+			if self.updateFooterFont then
+				self:updateFooterFont()
+			end
+			G_reader_settings:saveSetting("footer", self.settings)
+			should_flush = true
+			-- Without this the footer keeps the old face until the user taps it.
+			should_repaint = self.refreshFooter ~= nil
 		end
 
 		-- Migration for older patch versions that saved a 1-based order table.
@@ -116,6 +148,10 @@ function ReaderFooter:init(...)
 			self:updateFooterTextGenerator()
 			self:applyFooterMode()
 			self:resetLayout()
+		end
+
+		if should_repaint then
+			self:refreshFooter(true, true)
 		end
 
 		if should_flush and G_reader_settings.flush then

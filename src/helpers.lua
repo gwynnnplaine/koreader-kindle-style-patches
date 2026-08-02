@@ -54,6 +54,28 @@ local function formatTime(minutes)
 	end
 end
 
+-- (face, isRegistered) -> bold face file, or nil when nothing should change.
+local function resolveBoldFontFace(face, isRegistered)
+	if type(face) ~= "string" or face == "" then
+		return nil
+	end
+	if type(isRegistered) ~= "function" then
+		return nil
+	end
+
+	local stem, extension = face:match("^(.*)%-Regular(%.[%a%d]+)$")
+	if not stem then
+		return nil
+	end
+
+	local bold_face = stem .. "-Bold" .. extension
+	if not isRegistered(bold_face) then
+		return nil
+	end
+
+	return bold_face
+end
+
 local function getTimeString(footer, pages_left)
 	-- Method 1: Works on Emulator
 	if footer.ui.statistics and footer.ui.statistics.getTimeForPages then
@@ -80,6 +102,7 @@ local function getTimeString(footer, pages_left)
 end
 
 local helpers = {
+	resolveBoldFontFace = resolveBoldFontFace,
 	getMinutes = getMinutes,
 	formatTime = formatTime,
 	getTimeString = getTimeString,
