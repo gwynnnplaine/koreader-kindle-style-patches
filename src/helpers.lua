@@ -12,9 +12,8 @@ local TEXT = {
 	HOURS_TEXT = " hrs",
 }
 
--- No-break space and hair space, written as bytes so every Lua version reads them.
+-- No-break space, written as bytes so every Lua version reads it.
 local NO_BREAK_SPACE = "\194\160"
-local HAIR_SPACE = "\226\128\138"
 
 -- (time_string) -> minutes, or nil when the text is not a reading time.
 local function parseMinutes(time_string)
@@ -107,55 +106,6 @@ local function getNextLeftMode(mode)
 	return LEFT_MODES[1]
 end
 
--- Width KOReader's dynamic filler fills, mirroring its own calculation, or
--- nil when there is no filler (progress bar drawn alongside the text).
-local function getFillerTarget(settings, screen_width, horizontal_margin, progress_margin)
-	local margin = horizontal_margin
-	if not settings.disable_progress_bar then
-		if settings.progress_bar_position == "alongside" then
-			return nil
-		end
-		if settings.align == "center" then
-			margin = progress_margin
-		end
-	end
-	return math.floor(screen_width - 2 * margin)
-end
-
--- (gap, pads) -> padding text whose width is exactly gap, using the fewest
--- characters, or the widest padding that still fits when gap can't be hit
--- exactly; the second result says whether it is exact.
--- pads is a list of { char = "...", width = pixels }.
-local function planPadding(gap, pads)
-	if type(gap) ~= "number" or gap <= 0 then
-		return "", gap == 0
-	end
-	gap = math.floor(gap)
-
-	-- best[w] = shortest padding that is exactly w pixels wide
-	local best = { [0] = "" }
-	local best_count = { [0] = 0 }
-	for w = 1, gap do
-		for _, pad in ipairs(pads) do
-			local prev = w - pad.width
-			if pad.width > 0 and prev >= 0 and best[prev] then
-				local count = best_count[prev] + 1
-				if not best_count[w] or count < best_count[w] then
-					best[w] = best[prev] .. pad.char
-					best_count[w] = count
-				end
-			end
-		end
-	end
-
-	for w = gap, 0, -1 do
-		if best[w] then
-			return best[w], w == gap
-		end
-	end
-	return "", false
-end
-
 -- (face, isRegistered) -> bold face file, or nil when nothing should change.
 local function resolveBoldFontFace(face, isRegistered)
 	if type(face) ~= "string" or face == "" then
@@ -212,9 +162,6 @@ local helpers = {
 	keepSpaces = keepSpaces,
 	normalizeLeftMode = normalizeLeftMode,
 	getNextLeftMode = getNextLeftMode,
-	getFillerTarget = getFillerTarget,
-	planPadding = planPadding,
 	NO_BREAK_SPACE = NO_BREAK_SPACE,
-	HAIR_SPACE = HAIR_SPACE,
 }
 return helpers

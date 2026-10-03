@@ -1,31 +1,13 @@
 -- Runs the real src/footer.lua against a fake KOReader.
 
 local NBSP = "\194\160"
-local HAIR = "\226\128\138"
-local THIN = "\226\128\137"
-local SIX_PER_EM = "\226\128\134"
-local PUNCTUATION = "\226\128\136"
 
-local six_per_em_width = 1
-local odd_percent = false
-
--- Fake font: normal and no-break spaces 10px, hair 2px, thin 3px, six-per-em
--- 1px, punctuation space 4px, anything else 12px.
+-- Fake font: normal and no-break spaces 10px, anything else 12px.
 local function textWidth(text)
 	local width = 0
 	for char in text:gmatch("[%z\1-\127\194-\244][\128-\191]*") do
 		if char == " " or char == NBSP then
 			width = width + 10
-		elseif char == HAIR then
-			width = width + 2
-		elseif char == THIN then
-			width = width + 3
-		elseif char == SIX_PER_EM then
-			width = width + six_per_em_width
-		elseif char == PUNCTUATION then
-			width = width + 4
-		elseif char == "%" and odd_percent then
-			width = width + 7
 		else
 			width = width + 12
 		end
@@ -35,15 +17,12 @@ end
 
 local function buildKOReader(options)
 	options = options or {}
-	six_per_em_width = options.six_per_em_width or 1
-	odd_percent = options.odd_percent or false
 	local saved = { kindle_ui_applied = true, kindle_ui_left_mode = options.left_mode }
 	local generators = {
 		chapter_time_to_read = function() return "fallback" end,
 		percentage = function() return options.percentage or "42%" end,
 	}
 	local original_taps = 0
-	local measurements = 0
 
 	local ReaderFooter = {}
 	function ReaderFooter.applyFooterMode() end
@@ -61,14 +40,6 @@ local function buildKOReader(options)
 		return left .. string.rep(" ", math.max(spaces, 0)) .. right, true
 	end
 
-	local TextWidget = {}
-	function TextWidget:new(args)
-		measurements = measurements + 1
-		return {
-			getSize = function() return { w = textWidth(args.text) } end,
-			free = function() end,
-		}
-	end
 
 	_G.G_reader_settings = {
 		readSetting = function(_, key, default)
@@ -83,8 +54,6 @@ local function buildKOReader(options)
 	}
 
 	package.loaded["apps/reader/modules/readerfooter"] = ReaderFooter
-	package.loaded["ui/widget/textwidget"] = TextWidget
-	package.loaded["device"] = { screen = { scaleBySize = function(_, value) return value end } }
 	package.loaded["userpatch"] = {
 		getUpValue = function() return generators end,
 	}
@@ -105,7 +74,6 @@ local function buildKOReader(options)
 		mode = options.hidden and 0 or 1,
 		mode_list = { off = 0 },
 		view = { flipping_visible = false },
-		footer_text_face = options.measured ~= false and {} or nil,
 		_saved_screen_width = 600,
 		horizontal_margin = 10,
 		updates = 0,
@@ -125,16 +93,12 @@ local function buildKOReader(options)
 		self.updates = self.updates + 1
 	end
 
-	return footer, generators, saved, function() return original_taps end, function() return measurements end
-end
-
-local function stripPadding(text)
-	return (text:gsub(HAIR, ""):gsub(THIN, ""):gsub(SIX_PER_EM, ""):gsub(PUNCTUATION, ""))
+	return footer, generators, saved, function() return original_taps end
 end
 
 describe("footer left item", function()
 	it("keeps the gaps between words in compact mode", function()
-		local footer, generators = buildKOReader({ measured = false })
+		local footer, generators = buildKOReader()
 		assert.are.equal(NBSP .. "25" .. NBSP .. "mins" .. NBSP .. "left" .. NBSP .. "in" .. NBSP .. "chapter",
 			generators.chapter_time_to_read(footer))
 	end)
@@ -142,16 +106,16 @@ describe("footer left item", function()
 	it("shows the chapter time by default", function()
 		local footer, generators = buildKOReader()
 		assert.are.equal(NBSP .. "25" .. NBSP .. "mins" .. NBSP .. "left" .. NBSP .. "in" .. NBSP .. "chapter",
-			stripPadding(generators.chapter_time_to_read(footer)))
+			generators.chapter_time_to_read(footer))
 	end)
 
 	it("shows the page number", function()
-		local footer, generators = buildKOReader({ left_mode = "page", measured = false })
+		local footer, generators = buildKOReader({ left_mode = "page" })
 		assert.are.equal(NBSP .. "Page" .. NBSP .. "5", generators.chapter_time_to_read(footer))
 	end)
 
 	it("shows the time left in the book in hours and minutes", function()
-		local footer, generators = buildKOReader({ left_mode = "book", measured = false })
+		local footer, generators = buildKOReader({ left_mode = "book" })
 		assert.are.equal(NBSP .. "4" .. NBSP .. "hrs" .. NBSP .. "40" .. NBSP .. "mins" .. NBSP .. "left"
 			.. NBSP .. "in" .. NBSP .. "book", generators.chapter_time_to_read(footer))
 	end)
@@ -159,7 +123,6 @@ describe("footer left item", function()
 	it("falls back to the chapter time when the book time is unknown", function()
 		local footer, generators = buildKOReader({
 			left_mode = "book",
-			measured = false,
 			time_for_pages = function(pages)
 				if pages == 280 then
 					error("no statistics yet")
@@ -174,14 +137,13 @@ describe("footer left item", function()
 
 	it("leaves text that is not a reading time to KOReader", function()
 		local footer, generators = buildKOReader({
-			measured = false,
 			time_for_pages = function() return "N/A" end,
 		})
 		assert.are.equal(NBSP .. "fallback", generators.chapter_time_to_read(footer))
 	end)
 
 	it("says the chapter is completed", function()
-		local footer, generators = buildKOReader({ chapter_pages_left = 0, measured = false })
+		local footer, generators = buildKOReader({ chapter_pages_left = 0 })
 		assert.are.equal(NBSP .. "Chapter" .. NBSP .. "completed", generators.chapter_time_to_read(footer))
 	end)
 
@@ -201,57 +163,6 @@ describe("footer margins", function()
 		assert.are.equal(true, textWidth(text) <= 580)
 		assert.are.equal(NBSP, text:sub(1, 2))
 		assert.are.equal("42%" .. NBSP .. NBSP, text:sub(-7))
-	end)
-end)
-
-describe("footer percentage position", function()
-	it("ends at the same pixel whatever the left item shows", function()
-		for _, mode in ipairs({ "page", "chapter", "book" }) do
-			for _, minutes in ipairs({ 1, 7, 25, 61, 280 }) do
-				local footer = buildKOReader({
-					left_mode = mode,
-					time_for_pages = function() return minutes .. "m" end,
-				})
-				assert.are.equal(580, textWidth((footer:genAllFooterText())))
-			end
-		end
-	end)
-
-	it("still ends at the same pixel when no space is narrower than 2px", function()
-		local one_pixel_gaps = 0
-		for _, percentage in ipairs({ "4%", "42%", "100%" }) do
-			for pageno = 1, 40 do
-				local footer = buildKOReader({
-					left_mode = "page",
-					percentage = percentage,
-					six_per_em_width = 2,
-					odd_percent = true,
-				})
-				footer.pageno = pageno
-				local plain = textWidth(NBSP .. "Page" .. NBSP .. pageno) + textWidth(percentage .. NBSP .. NBSP)
-				if (580 - plain) % 10 == 1 then
-					one_pixel_gaps = one_pixel_gaps + 1
-				end
-				assert.are.equal(580, textWidth((footer:genAllFooterText())))
-			end
-		end
-		-- the loop must really have met the 1px case
-		assert.are.equal(true, one_pixel_gaps > 0)
-	end)
-
-	it("measures each distinct line only once", function()
-		local footer, generators, _, _, measurements = buildKOReader()
-		generators.chapter_time_to_read(footer)
-		local after_first = measurements()
-		generators.chapter_time_to_read(footer)
-		generators.chapter_time_to_read(footer)
-		assert.are.equal(after_first, measurements())
-	end)
-
-	it("falls back to no padding before the footer is laid out", function()
-		local footer, generators = buildKOReader({ measured = false })
-		local text = generators.chapter_time_to_read(footer)
-		assert.are.equal(text, stripPadding(text))
 	end)
 end)
 
@@ -285,7 +196,6 @@ describe("ReaderFooter:TapFooter()", function()
 		local footer, generators, saved, original_taps = buildKOReader({
 			tap_to_cycle = false,
 			left_mode = "book",
-			measured = false,
 		})
 		assert.are.equal("original", footer:TapFooter({}))
 		assert.are.equal(1, original_taps())
