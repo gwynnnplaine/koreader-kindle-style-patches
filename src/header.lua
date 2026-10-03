@@ -39,8 +39,9 @@ local orig_paintTo = ReaderView.paintTo
 
 -- Keep the clock current while a page stays open: once a minute, right
 -- after the minute changes, redraw just the strip at the top of the page.
--- Nothing is redrawn while the device sleeps, and the timer stops when no
--- book is open.
+-- Nothing is redrawn while the device sleeps or while a menu or dialog is
+-- shown over the book (the clock catches up when it closes), and the timer
+-- stops when no book is open.
 local clock_timer_running = false
 local last_clock_height = nil
 
@@ -56,7 +57,8 @@ local function refreshClock()
         return
     end
 
-    if not Device.screen_saver_mode then
+    local top_widget = UIManager:getTopmostVisibleWidget()
+    if not Device.screen_saver_mode and (top_widget == reader or top_widget == reader.dialog) then
         local height = (last_clock_height or Screen:scaleBySize(40)) + Screen:scaleBySize(4)
         UIManager:setDirty(reader.dialog, function()
             return "ui", Geom:new{ x = 0, y = 0, w = Screen:getWidth(), h = height }

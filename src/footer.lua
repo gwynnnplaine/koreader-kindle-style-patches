@@ -1,5 +1,6 @@
 local ReaderFooter = require("apps/reader/modules/readerfooter")
 local FooterTextWidget = require("ui/widget/textwidget")
+local Screen = require("device").screen
 local userpatch = require("userpatch")
 local helpers = require("helpers").helpers
 
@@ -10,6 +11,7 @@ local FOOTER_CONFIG = {
 	PAGE_TEXT = "Page %s", -- use "Page %s of %s" to also show the total
 	FOOTER_LEFT_MARGIN = 1, -- Character spaces on left
 	FOOTER_RIGHT_MARGIN = 2, -- Character spaces on right
+	TAP_TO_CYCLE = true, -- Tap the status bar to switch page / chapter time / book time / blank
 }
 
 local LEFT_MODE_SETTING = "kindle_ui_left_mode"
@@ -33,11 +35,11 @@ end
 local function calculateReadingTime(footer, pages_left)
 	local timeString = helpers.getTimeString(footer, pages_left)
 
-	if not timeString then
+	-- Text that is not a reading time is left to KOReader's own item.
+	local minutes = helpers.parseMinutes(timeString)
+	if not minutes then
 		return nil
 	end
-
-	local minutes = helpers.getMinutes(timeString)
 
 	local formattedTime = helpers.formatTime(minutes)
 
@@ -45,6 +47,9 @@ local function calculateReadingTime(footer, pages_left)
 end
 
 local function getLeftMode()
+	if not FOOTER_CONFIG.TAP_TO_CYCLE then
+		return helpers.normalizeLeftMode(nil)
+	end
 	return helpers.normalizeLeftMode(G_reader_settings:readSetting(LEFT_MODE_SETTING))
 end
 
@@ -159,8 +164,7 @@ end
 -- Keep the percentage at exactly the same spot whatever is shown on the left.
 -- KOReader fills the gap between left and right with whole spaces, so the
 -- right-hand item shifted by up to one space width depending on how wide the
--- left text was. The left text is padded with hair spaces until the whole
--- line is as close as possible to the full bar width.
+-- left text was. The left text is padded with hair spaces to close that gap.
 local function measureText(footer, text)
 	local widget = FooterTextWidget:new{
 		text = text,
@@ -172,37 +176,71 @@ local function measureText(footer, text)
 	return width
 end
 
+-- Widths only change with the font, so they are measured once per face.
+local hair_widths = setmetatable({}, { __mode = "k" })
+local line_widths = setmetatable({}, { __mode = "k" })
+local MAX_CACHED_LINES = 64
+
+local function getHairWidth(footer)
+	local face = footer.footer_text_face
+	local key = footer.settings.text_font_bold and "bold" or "regular"
+	hair_widths[face] = hair_widths[face] or {}
+	if not hair_widths[face][key] then
+		hair_widths[face][key] = measureText(footer, helpers.HAIR_SPACE:rep(20)) / 20
+	end
+	return hair_widths[face][key]
+end
+
+local function getLineWidth(footer, line)
+	local face = footer.footer_text_face
+	local key = (footer.settings.text_font_bold and "B" or "R") .. line
+	local cache = line_widths[face]
+	if not cache or cache.count >= MAX_CACHED_LINES then
+		cache = { count = 0, widths = {} }
+		line_widths[face] = cache
+	end
+	if not cache.widths[key] then
+		cache.widths[key] = measureText(footer, line)
+		cache.count = cache.count + 1
+	end
+	return cache.widths[key]
+end
+
 local measuring = false
-local candidate_hairs = 0
 
 local function getPaddedLeftText(footer, text)
-	local target = math.floor(footer._saved_screen_width - 2 * footer.horizontal_margin)
-	local space_w = measureText(footer, string.rep(" ", 20)) / 20
-	local hair_w = measureText(footer, helpers.HAIR_SPACE:rep(20)) / 20
-	if space_w <= 0 or hair_w <= 0 then
+	local target = helpers.getFillerTarget(
+		footer.settings,
+		footer._saved_screen_width,
+		footer.horizontal_margin,
+		Screen:scaleBySize(footer.settings.progress_margin_width or 0)
+	)
+	if not target then
 		return text
 	end
 
+	local hair_w = getHairWidth(footer)
+	if hair_w <= 0 then
+		return text
+	end
+
+	-- Build the line once without padding (KOReader adds its filler), then
+	-- add as many hair spaces as still fit in the gap that is left over.
 	measuring = true
-	local ok, best = pcall(helpers.pickPadding, target, math.ceil(space_w / hair_w) + 1, function(hairs)
-		candidate_hairs = hairs
-		return measureText(footer, (footer:genAllFooterText()))
-	end)
+	local ok, line = pcall(footer.genAllFooterText, footer)
 	measuring = false
-
-	if not ok then
+	if not ok or not line then
 		return text
 	end
-	return text .. helpers.HAIR_SPACE:rep(best)
+
+	local hairs = helpers.getPaddingCount(target, getLineWidth(footer, line), hair_w)
+	return text .. helpers.HAIR_SPACE:rep(hairs)
 end
 
 function footerTextGeneratorMap.chapter_time_to_read(footer)
 	local text = getLeftText(footer)
-	if not text or text == "" then
+	if not text or text == "" or measuring then
 		return text
-	end
-	if measuring then
-		return text .. helpers.HAIR_SPACE:rep(candidate_hairs)
 	end
 	if not footer.footer_text_face or not footer._saved_screen_width or not footer.horizontal_margin then
 		return text
@@ -216,8 +254,17 @@ function footerTextGeneratorMap.chapter_time_to_read(footer)
 end
 
 -- A tap on the status bar cycles the left item, like the Kindle's own reader.
+-- KOReader keeps handling the tap when cycling is turned off, the status bar
+-- is locked or hidden, or the page slider is open.
+local function isFooterHidden(footer)
+	return footer.mode_list and footer.mode == footer.mode_list.off
+end
+
 function ReaderFooter:TapFooter(ges)
-	if self.view.flipping_visible or self.settings.lock_tap then
+	if not FOOTER_CONFIG.TAP_TO_CYCLE
+		or self.view.flipping_visible
+		or self.settings.lock_tap
+		or isFooterHidden(self) then
 		return orig_TapFooter(self, ges)
 	end
 

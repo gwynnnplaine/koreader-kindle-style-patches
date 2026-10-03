@@ -5,6 +5,7 @@ local CONSTANTS = {
 }
 
 local TEXT = {
+	LESS_THAN_A_MINUTE_TEXT = "less than 1 min",
 	ONE_MINUTE_TEXT = "1 min",
 	MINUTES_TEXT = " mins",
 	ONE_HOUR_TEXT = " hr",
@@ -15,9 +16,10 @@ local TEXT = {
 local NO_BREAK_SPACE = "\194\160"
 local HAIR_SPACE = "\226\128\138"
 
-local function getMinutes(time_string)
-	if not time_string or time_string == "" then
-		return CONSTANTS.NO_MINUTES
+-- (time_string) -> minutes, or nil when the text is not a reading time.
+local function parseMinutes(time_string)
+	if type(time_string) ~= "string" or time_string == "" then
+		return nil
 	end
 
 	-- Format: "01:45" (hours:minutes)
@@ -46,12 +48,18 @@ local function getMinutes(time_string)
 		return hoursInMinutes + minutesValue
 	end
 
-	return CONSTANTS.NO_MINUTES
+	return nil
 end
 
--- Kindle wording: "1 min", "25 mins", "1 hr", "4 hrs 40 mins".
+local function getMinutes(time_string)
+	return parseMinutes(time_string) or CONSTANTS.NO_MINUTES
+end
+
+-- Kindle wording: "less than 1 min", "1 min", "25 mins", "1 hr", "4 hrs 40 mins".
 local function formatMinutes(minutes)
-	if minutes <= CONSTANTS.ONE_MINUTE then
+	if minutes <= CONSTANTS.NO_MINUTES then
+		return TEXT.LESS_THAN_A_MINUTE_TEXT
+	elseif minutes == CONSTANTS.ONE_MINUTE then
 		return TEXT.ONE_MINUTE_TEXT
 	end
 	return minutes .. TEXT.MINUTES_TEXT
@@ -99,20 +107,28 @@ local function getNextLeftMode(mode)
 	return LEFT_MODES[1]
 end
 
--- (target, max_count, measureWith) -> how many padding characters bring the
--- measured width closest to target without going over it.
-local function pickPadding(target, max_count, measureWith)
-	local best, best_gap = 0, math.huge
-	for count = 0, max_count do
-		local gap = target - measureWith(count)
-		if gap >= 0 and gap < best_gap then
-			best, best_gap = count, gap
+-- Width KOReader's dynamic filler fills, mirroring its own calculation, or
+-- nil when there is no filler (progress bar drawn alongside the text).
+local function getFillerTarget(settings, screen_width, horizontal_margin, progress_margin)
+	local margin = horizontal_margin
+	if not settings.disable_progress_bar then
+		if settings.progress_bar_position == "alongside" then
+			return nil
 		end
-		if gap == 0 then
-			break
+		if settings.align == "center" then
+			margin = progress_margin
 		end
 	end
-	return best
+	return math.floor(screen_width - 2 * margin)
+end
+
+-- (target, width, hair_width) -> how many hair spaces fit in the gap that is
+-- left between the end of the line and the end of the bar.
+local function getPaddingCount(target, width, hair_width)
+	if hair_width <= 0 or width >= target then
+		return 0
+	end
+	return math.floor((target - width) / hair_width)
 end
 
 -- (face, isRegistered) -> bold face file, or nil when nothing should change.
@@ -165,12 +181,14 @@ end
 local helpers = {
 	resolveBoldFontFace = resolveBoldFontFace,
 	getMinutes = getMinutes,
+	parseMinutes = parseMinutes,
 	formatTime = formatTime,
 	getTimeString = getTimeString,
 	keepSpaces = keepSpaces,
 	normalizeLeftMode = normalizeLeftMode,
 	getNextLeftMode = getNextLeftMode,
-	pickPadding = pickPadding,
+	getFillerTarget = getFillerTarget,
+	getPaddingCount = getPaddingCount,
 	NO_BREAK_SPACE = NO_BREAK_SPACE,
 	HAIR_SPACE = HAIR_SPACE,
 }

@@ -29,7 +29,9 @@ local function buildKOReader()
 			scaleBySize = function(_, value) return value end,
 		},
 	}
-	local ReaderUI = { instance = { dialog = { name = "reader" } } }
+	local ReaderUI = {}
+	ReaderUI.instance = { name = "reader" }
+	ReaderUI.instance.dialog = ReaderUI.instance
 
 	package.loaded["ffi/blitbuffer"] = { COLOR_BLACK = 0 }
 	package.loaded["ui/widget/textwidget"] = widgetClass({ w = 50, h = 20 })
@@ -49,6 +51,12 @@ local function buildKOReader()
 	package.loaded["ui/uimanager"] = {
 		scheduleIn = function(_, seconds, callback)
 			state.scheduled[#state.scheduled + 1] = { seconds = seconds, callback = callback }
+		end,
+		getTopmostVisibleWidget = function()
+			if state.top then
+				return state.top
+			end
+			return ReaderUI.instance
 		end,
 		setDirty = function(_, target, refresh)
 			local mode, region = refresh()
@@ -105,6 +113,20 @@ describe("header clock refresh", function()
 		assert.are.equal(1, #state.scheduled)
 	end)
 
+	it("does not redraw over a menu or dialog, but keeps the timer", function()
+		local view, state = buildKOReader()
+		view:paintTo({}, 0, 0)
+		state.top = { name = "ReaderMenu" }
+		state.tick()
+
+		assert.are.equal(0, #state.dirty)
+		assert.are.equal(1, #state.scheduled)
+
+		state.top = nil
+		state.tick()
+		assert.are.equal(1, #state.dirty)
+	end)
+
 	it("stops when no book is open and restarts on the next paint", function()
 		local view, state, _, ReaderUI = buildKOReader()
 		view:paintTo({}, 0, 0)
@@ -114,7 +136,8 @@ describe("header clock refresh", function()
 		assert.are.equal(0, #state.dirty)
 		assert.are.equal(0, #state.scheduled)
 
-		ReaderUI.instance = { dialog = { name = "reader" } }
+		ReaderUI.instance = { name = "reader" }
+		ReaderUI.instance.dialog = ReaderUI.instance
 		view:paintTo({}, 0, 0)
 		assert.are.equal(1, #state.scheduled)
 	end)

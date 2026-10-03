@@ -2,9 +2,12 @@ local helpers = dofile("src/helpers.lua")
 local formatTime = helpers.formatTime
 
 describe("formatTime()", function()
-	it("never shows less than one minute", function()
-		assert.are.equal("1 min", formatTime(0))
-		assert.are.equal("1 min", formatTime(-5))
+	it("says when less than a minute is left", function()
+		assert.are.equal("less than 1 min", formatTime(0))
+		assert.are.equal("less than 1 min", formatTime(-5))
+	end)
+
+	it("uses the singular for one minute", function()
 		assert.are.equal("1 min", formatTime(1))
 	end)
 

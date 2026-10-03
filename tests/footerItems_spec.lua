@@ -26,6 +26,7 @@ local function buildKOReader(options)
 		percentage = function() return "42%" end,
 	}
 	local original_taps = 0
+	local measurements = 0
 
 	local ReaderFooter = {}
 	function ReaderFooter.applyFooterMode() end
@@ -45,6 +46,7 @@ local function buildKOReader(options)
 
 	local TextWidget = {}
 	function TextWidget:new(args)
+		measurements = measurements + 1
 		return {
 			getSize = function() return { w = textWidth(args.text) } end,
 			free = function() end,
@@ -65,18 +67,26 @@ local function buildKOReader(options)
 
 	package.loaded["apps/reader/modules/readerfooter"] = ReaderFooter
 	package.loaded["ui/widget/textwidget"] = TextWidget
+	package.loaded["device"] = { screen = { scaleBySize = function(_, value) return value end } }
 	package.loaded["userpatch"] = {
 		getUpValue = function() return generators end,
 	}
 	package.loaded["helpers"] = { helpers = dofile("src/helpers.lua") }
 
-	dofile("src/footer.lua")
+	local source = io.open("src/footer.lua"):read("*a")
+	if options.tap_to_cycle == false then
+		source = source:gsub("TAP_TO_CYCLE = true", "TAP_TO_CYCLE = false")
+	end
+	local chunk = loadstring(source)
+	chunk()
 
 	local time_for_pages = options.time_for_pages or function(pages) return pages .. "m" end
 	local footer = setmetatable({
 		pageno = 5,
 		pages = 300,
-		settings = { lock_tap = options.lock_tap },
+		settings = { lock_tap = options.lock_tap, disable_progress_bar = true },
+		mode = options.hidden and 0 or 1,
+		mode_list = { off = 0 },
 		view = { flipping_visible = false },
 		footer_text_face = options.measured ~= false and {} or nil,
 		_saved_screen_width = 600,
@@ -98,7 +108,7 @@ local function buildKOReader(options)
 		self.updates = self.updates + 1
 	end
 
-	return footer, generators, saved, function() return original_taps end
+	return footer, generators, saved, function() return original_taps end, function() return measurements end
 end
 
 local function stripPadding(text)
@@ -145,6 +155,14 @@ describe("footer left item", function()
 			generators.chapter_time_to_read(footer))
 	end)
 
+	it("leaves text that is not a reading time to KOReader", function()
+		local footer, generators = buildKOReader({
+			measured = false,
+			time_for_pages = function() return "N/A" end,
+		})
+		assert.are.equal(NBSP .. "fallback", generators.chapter_time_to_read(footer))
+	end)
+
 	it("says the chapter is completed", function()
 		local footer, generators = buildKOReader({ chapter_pages_left = 0, measured = false })
 		assert.are.equal(NBSP .. "Chapter" .. NBSP .. "completed", generators.chapter_time_to_read(footer))
@@ -182,6 +200,15 @@ describe("footer percentage position", function()
 		end
 	end)
 
+	it("measures each distinct line only once", function()
+		local footer, generators, _, _, measurements = buildKOReader()
+		generators.chapter_time_to_read(footer)
+		local after_first = measurements()
+		generators.chapter_time_to_read(footer)
+		generators.chapter_time_to_read(footer)
+		assert.are.equal(after_first, measurements())
+	end)
+
 	it("falls back to no padding before the footer is laid out", function()
 		local footer, generators = buildKOReader({ measured = false })
 		assert.are.equal(nil, generators.chapter_time_to_read(footer):find(HAIR, 1, true))
@@ -205,6 +232,27 @@ describe("ReaderFooter:TapFooter()", function()
 		assert.are.equal("original", footer:TapFooter({}))
 		assert.are.equal(1, original_taps())
 		assert.is_nil(saved.kindle_ui_left_mode)
+	end)
+
+	it("lets KOReader bring back a hidden status bar", function()
+		local footer, _, saved, original_taps = buildKOReader({ hidden = true })
+		assert.are.equal("original", footer:TapFooter({}))
+		assert.are.equal(1, original_taps())
+		assert.is_nil(saved.kindle_ui_left_mode)
+	end)
+
+	it("can be turned off in FOOTER_CONFIG", function()
+		local footer, generators, saved, original_taps = buildKOReader({
+			tap_to_cycle = false,
+			left_mode = "book",
+			measured = false,
+		})
+		assert.are.equal("original", footer:TapFooter({}))
+		assert.are.equal(1, original_taps())
+		assert.are.equal("book", saved.kindle_ui_left_mode)
+		-- the saved mode is ignored: the chapter time is always shown
+		assert.are.equal(NBSP .. "25" .. NBSP .. "mins" .. NBSP .. "left" .. NBSP .. "in" .. NBSP .. "chapter",
+			generators.chapter_time_to_read(footer))
 	end)
 
 	it("leaves taps while flipping to KOReader", function()

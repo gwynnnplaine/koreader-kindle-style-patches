@@ -54,7 +54,9 @@ Located in the patch file's `FOOTER_CONFIG` table:
 - `FOOTER_LEFT_MARGIN` — Left padding in character spaces (default: 1)
 - `FOOTER_RIGHT_MARGIN` — Right padding in character spaces (default: 2)
 
-Tap the status bar to cycle the left item: page → time left in chapter → time left in book → blank. The choice is saved as `kindle_ui_left_mode`.
+- `TAP_TO_CYCLE` — Tap the status bar to cycle the left item (default: true; set to false to keep KOReader's normal tap and always show the chapter time)
+
+With `TAP_TO_CYCLE` on, a tap on the status bar cycles the left item: page → time left in chapter → time left in book → blank. The choice is saved as `kindle_ui_left_mode`. If the status bar is hidden, a tap brings it back as usual.
 
 ## Testing & Feedback
 
