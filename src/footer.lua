@@ -10,9 +10,9 @@ local FOOTER_CONFIG = {
 	FOOTER_RIGHT_MARGIN = 2, -- Character spaces on right
 }
 
-local orig_genFooterText = ReaderFooter.genAllFooterText
 local footerTextGeneratorMap = userpatch.getUpValue(ReaderFooter.applyFooterMode, "footerTextGeneratorMap")
 local original_chapter_time_to_read = footerTextGeneratorMap.chapter_time_to_read
+local original_percentage = footerTextGeneratorMap.percentage
 
 local function canCalculateCustomTime(footer)
 	local result = footer.ui.statistics and footer.ui.statistics.is_doc
@@ -44,7 +44,7 @@ local function formatChapterTimeDisplay(time)
 	return result
 end
 
-function footerTextGeneratorMap.chapter_time_to_read(footer)
+local function getChapterText(footer)
 	local fallback = original_chapter_time_to_read(footer)
 
 	if not canCalculateCustomTime(footer) then
@@ -69,10 +69,21 @@ function footerTextGeneratorMap.chapter_time_to_read(footer)
 	return result
 end
 
--- Override genAllFooterText for margins
-function ReaderFooter:genAllFooterText(...)
-	local text, is_filler_inside = orig_genFooterText(self, ...)
-	local left_margin = string.rep(" ", FOOTER_CONFIG.FOOTER_LEFT_MARGIN)
-	local right_margin = string.rep(" ", FOOTER_CONFIG.FOOTER_RIGHT_MARGIN)
-	return left_margin .. text .. right_margin, is_filler_inside
+-- Side margins are part of the items themselves (as no-break spaces), so
+-- KOReader measures and draws exactly the same text. Adding them after
+-- genAllFooterText made the line wider than the bar, and KOReader then cut
+-- the percentage down to "…".
+local function addMargins(text, left, right)
+	if not text or text == "" then
+		return text
+	end
+	return helpers.NO_BREAK_SPACE:rep(left) .. helpers.keepSpaces(text) .. helpers.NO_BREAK_SPACE:rep(right)
+end
+
+function footerTextGeneratorMap.chapter_time_to_read(footer)
+	return addMargins(getChapterText(footer), FOOTER_CONFIG.FOOTER_LEFT_MARGIN, 0)
+end
+
+function footerTextGeneratorMap.percentage(footer)
+	return addMargins(original_percentage(footer), 0, FOOTER_CONFIG.FOOTER_RIGHT_MARGIN)
 end
