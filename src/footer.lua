@@ -176,37 +176,92 @@ local function measureText(footer, text)
 	return width
 end
 
--- Widths only change with the font, so they are measured once per face.
-local hair_widths = setmetatable({}, { __mode = "k" })
-local line_widths = setmetatable({}, { __mode = "k" })
+-- Invisible spaces of different widths: mixing them lets the padding fill
+-- the gap to the exact pixel.
+local PAD_CHARS = {
+	helpers.HAIR_SPACE,
+	"\226\128\137", -- thin space
+	"\226\128\134", -- six-per-em space
+	"\226\128\136", -- punctuation space
+}
+local MAX_ATTEMPTS = 6
 local MAX_CACHED_LINES = 64
 
-local function getHairWidth(footer)
+-- Widths only change with the font, so everything is measured once per face.
+local face_caches = setmetatable({}, { __mode = "k" })
+
+local function getFaceCache(footer)
 	local face = footer.footer_text_face
 	local key = footer.settings.text_font_bold and "bold" or "regular"
-	hair_widths[face] = hair_widths[face] or {}
-	if not hair_widths[face][key] then
-		hair_widths[face][key] = measureText(footer, helpers.HAIR_SPACE:rep(20)) / 20
-	end
-	return hair_widths[face][key]
-end
-
-local function getLineWidth(footer, line)
-	local face = footer.footer_text_face
-	local key = (footer.settings.text_font_bold and "B" or "R") .. line
-	local cache = line_widths[face]
+	face_caches[face] = face_caches[face] or {}
+	local cache = face_caches[face][key]
 	if not cache or cache.count >= MAX_CACHED_LINES then
-		cache = { count = 0, widths = {} }
-		line_widths[face] = cache
+		cache = {
+			count = 0,
+			padding = {},
+			pads = cache and cache.pads,
+			space_width = cache and cache.space_width,
+		}
+		face_caches[face][key] = cache
 	end
-	if not cache.widths[key] then
-		cache.widths[key] = measureText(footer, line)
-		cache.count = cache.count + 1
+	if not cache.pads then
+		cache.pads = {}
+		for _, char in ipairs(PAD_CHARS) do
+			local width = math.floor(measureText(footer, char:rep(20)) / 20 + 0.5)
+			if width > 0 then
+				table.insert(cache.pads, { char = char, width = width })
+			end
+		end
+		cache.space_width = math.floor(measureText(footer, string.rep(" ", 20)) / 20 + 0.5)
 	end
-	return cache.widths[key]
+	return cache
 end
 
 local measuring = false
+local candidate_padding = ""
+
+local function measureLine(footer, padding)
+	candidate_padding = padding
+	return measureText(footer, (footer:genAllFooterText()))
+end
+
+-- Build the line without padding (KOReader adds its filler), plan padding
+-- for the gap that is left, then measure the padded line and correct the
+-- plan until the line ends exactly at the bar's end. Never wider than the bar.
+-- A gap the padding can't fill exactly (e.g. 1px when the narrowest space is
+-- 2px) is filled as gap + one space instead: KOReader's filler then drops a
+-- space, and the line still ends at the same pixel.
+local function findPadding(footer, target, cache)
+	local plain_width = measureLine(footer, "")
+	local best, best_width = "", plain_width
+	if plain_width >= target then
+		return best
+	end
+
+	local want = target - plain_width
+	for _ = 1, MAX_ATTEMPTS do
+		local padding, exact = helpers.planPadding(want, cache.pads)
+		if not exact and cache.space_width > 0 then
+			want = want + cache.space_width
+			padding = helpers.planPadding(want, cache.pads)
+		end
+		if padding == "" then
+			break
+		end
+		local width = measureLine(footer, padding)
+		if width <= target and width > best_width then
+			best, best_width = padding, width
+		end
+		if width == target then
+			break
+		end
+		want = want + (target - width)
+		if want <= 0 then
+			break
+		end
+	end
+	return best
+end
 
 local function getPaddedLeftText(footer, text)
 	local target = helpers.getFillerTarget(
@@ -219,28 +274,38 @@ local function getPaddedLeftText(footer, text)
 		return text
 	end
 
-	local hair_w = getHairWidth(footer)
-	if hair_w <= 0 then
+	local cache = getFaceCache(footer)
+	if #cache.pads == 0 then
 		return text
 	end
 
-	-- Build the line once without padding (KOReader adds its filler), then
-	-- add as many hair spaces as still fit in the gap that is left over.
 	measuring = true
+	candidate_padding = ""
 	local ok, line = pcall(footer.genAllFooterText, footer)
+	local key = ok and line and (target .. "|" .. line)
+	local padding = key and cache.padding[key]
+	if key and not padding then
+		ok, padding = pcall(findPadding, footer, target, cache)
+		if ok then
+			cache.padding[key] = padding
+			cache.count = cache.count + 1
+		end
+	end
 	measuring = false
-	if not ok or not line then
+
+	if not ok or not padding then
 		return text
 	end
-
-	local hairs = helpers.getPaddingCount(target, getLineWidth(footer, line), hair_w)
-	return text .. helpers.HAIR_SPACE:rep(hairs)
+	return text .. padding
 end
 
 function footerTextGeneratorMap.chapter_time_to_read(footer)
 	local text = getLeftText(footer)
-	if not text or text == "" or measuring then
+	if not text or text == "" then
 		return text
+	end
+	if measuring then
+		return text .. candidate_padding
 	end
 	if not footer.footer_text_face or not footer._saved_screen_width or not footer.horizontal_margin then
 		return text

@@ -1,21 +1,48 @@
 local helpers = dofile("src/helpers.lua")
-local getPaddingCount = helpers.getPaddingCount
+local planPadding = helpers.planPadding
 local getFillerTarget = helpers.getFillerTarget
 
-describe("getPaddingCount()", function()
-	it("fills the gap left at the end of the line", function()
-		-- 9px left over, 2px hair spaces: 4 of them fit.
-		assert.are.equal(4, getPaddingCount(580, 571, 2))
-		assert.are.equal(3, getPaddingCount(580, 574, 2))
+local PADS = {
+	{ char = "h", width = 2 },
+	{ char = "t", width = 3 },
+}
+
+local function width(padding)
+	local total = 0
+	for char in padding:gmatch(".") do
+		total = total + (char == "h" and 2 or 3)
+	end
+	return total
+end
+
+describe("planPadding()", function()
+	it("fills every gap exactly when the widths allow it", function()
+		for gap = 2, 30 do
+			assert.are.equal(gap, width(planPadding(gap, PADS)))
+		end
 	end)
 
-	it("adds nothing when the line already reaches the bar", function()
-		assert.are.equal(0, getPaddingCount(580, 580, 2))
-		assert.are.equal(0, getPaddingCount(580, 590, 2))
+	it("uses as few characters as possible", function()
+		assert.are.equal(3, #planPadding(9, PADS))
+		assert.are.equal(4, #planPadding(11, PADS))
 	end)
 
-	it("adds nothing without a usable hair space width", function()
-		assert.are.equal(0, getPaddingCount(580, 500, 0))
+	it("says whether the gap is hit exactly", function()
+		local _, exact = planPadding(7, PADS)
+		assert.are.equal(true, exact)
+		_, exact = planPadding(1, PADS)
+		assert.are.equal(false, exact)
+	end)
+
+	it("never goes over the gap when it can't be hit exactly", function()
+		assert.are.equal("", (planPadding(1, PADS)))
+		assert.are.equal("hh", (planPadding(5, { { char = "h", width = 2 } })))
+	end)
+
+	it("adds nothing for no gap", function()
+		assert.are.equal("", planPadding(0, PADS))
+		assert.are.equal("", planPadding(-3, PADS))
+		assert.are.equal("", planPadding(nil, PADS))
 	end)
 end)
 

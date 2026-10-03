@@ -2,8 +2,15 @@
 
 local NBSP = "\194\160"
 local HAIR = "\226\128\138"
+local THIN = "\226\128\137"
+local SIX_PER_EM = "\226\128\134"
+local PUNCTUATION = "\226\128\136"
 
--- Fake font: normal and no-break spaces 10px, hair spaces 2px, anything else 12px.
+local six_per_em_width = 1
+local odd_percent = false
+
+-- Fake font: normal and no-break spaces 10px, hair 2px, thin 3px, six-per-em
+-- 1px, punctuation space 4px, anything else 12px.
 local function textWidth(text)
 	local width = 0
 	for char in text:gmatch("[%z\1-\127\194-\244][\128-\191]*") do
@@ -11,6 +18,14 @@ local function textWidth(text)
 			width = width + 10
 		elseif char == HAIR then
 			width = width + 2
+		elseif char == THIN then
+			width = width + 3
+		elseif char == SIX_PER_EM then
+			width = width + six_per_em_width
+		elseif char == PUNCTUATION then
+			width = width + 4
+		elseif char == "%" and odd_percent then
+			width = width + 7
 		else
 			width = width + 12
 		end
@@ -20,10 +35,12 @@ end
 
 local function buildKOReader(options)
 	options = options or {}
+	six_per_em_width = options.six_per_em_width or 1
+	odd_percent = options.odd_percent or false
 	local saved = { kindle_ui_applied = true, kindle_ui_left_mode = options.left_mode }
 	local generators = {
 		chapter_time_to_read = function() return "fallback" end,
-		percentage = function() return "42%" end,
+		percentage = function() return options.percentage or "42%" end,
 	}
 	local original_taps = 0
 	local measurements = 0
@@ -112,7 +129,7 @@ local function buildKOReader(options)
 end
 
 local function stripPadding(text)
-	return (text:gsub(HAIR, ""))
+	return (text:gsub(HAIR, ""):gsub(THIN, ""):gsub(SIX_PER_EM, ""):gsub(PUNCTUATION, ""))
 end
 
 describe("footer left item", function()
@@ -200,6 +217,28 @@ describe("footer percentage position", function()
 		end
 	end)
 
+	it("still ends at the same pixel when no space is narrower than 2px", function()
+		local one_pixel_gaps = 0
+		for _, percentage in ipairs({ "4%", "42%", "100%" }) do
+			for pageno = 1, 40 do
+				local footer = buildKOReader({
+					left_mode = "page",
+					percentage = percentage,
+					six_per_em_width = 2,
+					odd_percent = true,
+				})
+				footer.pageno = pageno
+				local plain = textWidth(NBSP .. "Page" .. NBSP .. pageno) + textWidth(percentage .. NBSP .. NBSP)
+				if (580 - plain) % 10 == 1 then
+					one_pixel_gaps = one_pixel_gaps + 1
+				end
+				assert.are.equal(580, textWidth((footer:genAllFooterText())))
+			end
+		end
+		-- the loop must really have met the 1px case
+		assert.are.equal(true, one_pixel_gaps > 0)
+	end)
+
 	it("measures each distinct line only once", function()
 		local footer, generators, _, _, measurements = buildKOReader()
 		generators.chapter_time_to_read(footer)
@@ -211,7 +250,8 @@ describe("footer percentage position", function()
 
 	it("falls back to no padding before the footer is laid out", function()
 		local footer, generators = buildKOReader({ measured = false })
-		assert.are.equal(nil, generators.chapter_time_to_read(footer):find(HAIR, 1, true))
+		local text = generators.chapter_time_to_read(footer)
+		assert.are.equal(text, stripPadding(text))
 	end)
 end)
 

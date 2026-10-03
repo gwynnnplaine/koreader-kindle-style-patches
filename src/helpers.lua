@@ -122,13 +122,38 @@ local function getFillerTarget(settings, screen_width, horizontal_margin, progre
 	return math.floor(screen_width - 2 * margin)
 end
 
--- (target, width, hair_width) -> how many hair spaces fit in the gap that is
--- left between the end of the line and the end of the bar.
-local function getPaddingCount(target, width, hair_width)
-	if hair_width <= 0 or width >= target then
-		return 0
+-- (gap, pads) -> padding text whose width is exactly gap, using the fewest
+-- characters, or the widest padding that still fits when gap can't be hit
+-- exactly; the second result says whether it is exact.
+-- pads is a list of { char = "...", width = pixels }.
+local function planPadding(gap, pads)
+	if type(gap) ~= "number" or gap <= 0 then
+		return "", gap == 0
 	end
-	return math.floor((target - width) / hair_width)
+	gap = math.floor(gap)
+
+	-- best[w] = shortest padding that is exactly w pixels wide
+	local best = { [0] = "" }
+	local best_count = { [0] = 0 }
+	for w = 1, gap do
+		for _, pad in ipairs(pads) do
+			local prev = w - pad.width
+			if pad.width > 0 and prev >= 0 and best[prev] then
+				local count = best_count[prev] + 1
+				if not best_count[w] or count < best_count[w] then
+					best[w] = best[prev] .. pad.char
+					best_count[w] = count
+				end
+			end
+		end
+	end
+
+	for w = gap, 0, -1 do
+		if best[w] then
+			return best[w], w == gap
+		end
+	end
+	return "", false
 end
 
 -- (face, isRegistered) -> bold face file, or nil when nothing should change.
@@ -188,7 +213,7 @@ local helpers = {
 	normalizeLeftMode = normalizeLeftMode,
 	getNextLeftMode = getNextLeftMode,
 	getFillerTarget = getFillerTarget,
-	getPaddingCount = getPaddingCount,
+	planPadding = planPadding,
 	NO_BREAK_SPACE = NO_BREAK_SPACE,
 	HAIR_SPACE = HAIR_SPACE,
 }
