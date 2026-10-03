@@ -48,10 +48,15 @@ Located in the patch file's `HEADER_CONFIG` table:
 ### Footer Configuration
 Located in the patch file's `FOOTER_CONFIG` table:
 - `CHAPTER_COMPLETED_TEXT` — Text shown when chapter is complete (default: "Chapter completed")
-- `LABEL_TEXT` — Text displayed before reading time (default: "Time left in chapter:")
-- `LABEL_MIN_WIDTH` — Minimum character width for alignment (default: 5)
+- `CHAPTER_SUFFIX` — Text after the chapter time (default: "left in chapter", e.g. "25 mins left in chapter")
+- `BOOK_SUFFIX` — Text after the book time (default: "left in book", e.g. "4 hrs 40 mins left in book")
+- `PAGE_TEXT` — Page item format (default: "Page %s"; use "Page %s of %s" to also show the total)
 - `FOOTER_LEFT_MARGIN` — Left padding in character spaces (default: 1)
 - `FOOTER_RIGHT_MARGIN` — Right padding in character spaces (default: 2)
+
+- `TAP_TO_CYCLE` — Tap the status bar to cycle the left item (default: true; set to false to keep KOReader's normal tap and always show the chapter time)
+
+With `TAP_TO_CYCLE` on, a tap on the status bar cycles the left item: page → time left in chapter → time left in book → blank. The choice is saved as `kindle_ui_left_mode`. If the status bar is hidden, a tap brings it back as usual.
 
 ## Testing & Feedback
 

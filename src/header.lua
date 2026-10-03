@@ -33,8 +33,48 @@ local datetime = require("datetime")
 local Device = require("device")
 local Screen = Device.screen
 local ReaderView = require("apps/reader/modules/readerview")
+local UIManager = require("ui/uimanager")
 
 local orig_paintTo = ReaderView.paintTo
+
+-- Keep the clock current while a page stays open: once a minute, right
+-- after the minute changes, redraw just the strip at the top of the page.
+-- Nothing is redrawn while the device sleeps or while a menu or dialog is
+-- shown over the book (the clock catches up when it closes), and the timer
+-- stops when no book is open.
+local clock_timer_running = false
+local last_clock_height = nil
+
+local function secondsToNextMinute()
+    return 61 - tonumber(os.date("%S"))
+end
+
+local function refreshClock()
+    local ReaderUI = require("apps/reader/readerui")
+    local reader = ReaderUI.instance
+    if not reader or not reader.dialog then
+        clock_timer_running = false
+        return
+    end
+
+    local top_widget = UIManager:getTopmostVisibleWidget()
+    if not Device.screen_saver_mode and (top_widget == reader or top_widget == reader.dialog) then
+        local height = (last_clock_height or Screen:scaleBySize(40)) + Screen:scaleBySize(4)
+        UIManager:setDirty(reader.dialog, function()
+            return "ui", Geom:new{ x = 0, y = 0, w = Screen:getWidth(), h = height }
+        end)
+    end
+
+    UIManager:scheduleIn(secondsToNextMinute(), refreshClock)
+end
+
+local function startClockTimer()
+    if clock_timer_running then
+        return
+    end
+    clock_timer_running = true
+    UIManager:scheduleIn(secondsToNextMinute(), refreshClock)
+end
 
 function ReaderView:paintTo(bb, x, y)
     orig_paintTo(self, bb, x, y)
@@ -93,6 +133,8 @@ function ReaderView:paintTo(bb, x, y)
 	}
 
 	local header_height = header_text:getSize().h + HEADER_CONFIG.top_padding
+	last_clock_height = header_height
+	startClockTimer()
 
 	local header = CenterContainer:new{
 		dimen = Geom:new{ w = screen_width, h = header_height },
