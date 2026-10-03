@@ -44,6 +44,15 @@ local function getMinutes(time_string)
 	return CONSTANTS.NO_MINUTES
 end
 
+-- No-break space, written as bytes so every Lua version reads it.
+local NO_BREAK_SPACE = "\194\160"
+
+-- KOReader's "compact" status bar squeezes every normal space into a hair
+-- space. No-break spaces are left alone, so the words keep their gaps.
+local function keepSpaces(text)
+	return (text:gsub(" ", NO_BREAK_SPACE))
+end
+
 local function formatTime(minutes)
 	if minutes <= CONSTANTS.NO_MINUTES then
 		return TEXT.LESS_THAN_A_MINUTE_TEXT
@@ -106,5 +115,7 @@ local helpers = {
 	getMinutes = getMinutes,
 	formatTime = formatTime,
 	getTimeString = getTimeString,
+	keepSpaces = keepSpaces,
+	NO_BREAK_SPACE = NO_BREAK_SPACE,
 }
 return helpers
