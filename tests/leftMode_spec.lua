@@ -1,0 +1,27 @@
+local helpers = dofile("src/helpers.lua")
+
+describe("normalizeLeftMode()", function()
+	it("keeps a known mode", function()
+		assert.are.equal("page", helpers.normalizeLeftMode("page"))
+		assert.are.equal("book", helpers.normalizeLeftMode("book"))
+		assert.are.equal("none", helpers.normalizeLeftMode("none"))
+	end)
+
+	it("falls back to the chapter time", function()
+		assert.are.equal("chapter", helpers.normalizeLeftMode(nil))
+		assert.are.equal("chapter", helpers.normalizeLeftMode("bogus"))
+	end)
+end)
+
+describe("getNextLeftMode()", function()
+	it("cycles page -> chapter -> book -> none -> page", function()
+		assert.are.equal("chapter", helpers.getNextLeftMode("page"))
+		assert.are.equal("book", helpers.getNextLeftMode("chapter"))
+		assert.are.equal("none", helpers.getNextLeftMode("book"))
+		assert.are.equal("page", helpers.getNextLeftMode("none"))
+	end)
+
+	it("starts over at page for an unknown mode", function()
+		assert.are.equal("page", helpers.getNextLeftMode("bogus"))
+	end)
+end)
